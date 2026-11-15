@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23142029'/%3E%3Ccircle cx='16' cy='9' r='3' fill='%23ef5b5b'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23f2c14e'/%3E%3Ccircle cx='16' cy='23' r='3' fill='%233ddc97'/%3E%3C/svg%3E">
+<title>绿波城市 · 交通信号规划</title>
+<link rel="stylesheet" href="css/style.css?v=9">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <div class="mark">
+        <span class="lamp r"></span>
+        <span class="lamp y"></span>
+        <span class="lamp g"></span>
+      </div>
+      <div class="brand-text">
+        <h1>绿波城市</h1>
+        <p>GREEN WAVE CITY · 交通信号规划</p>
+      </div>
+    </div>
+
+    <div class="levelbar">
+      <span id="levelName" class="level-name">第 1 关 · 午间街区</span>
+      <div class="progress"><div id="timeFill"></div></div>
+      <span id="timeLeft" class="time-left">2:00</span>
+    </div>
+
+    <div class="controls">
+      <button id="btnPause" class="btn">暂停</button>
+      <div class="seg-ctrl" id="speedGroup">
+        <button data-speed="1" class="on">1×</button>
+        <button data-speed="2">2×</button>
+        <button data-speed="3">3×</button>
+      </div>
+      <button id="btnRestart" class="btn">重开</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="stage">
+      <canvas id="game" aria-label="城市路网地图"></canvas>
+      <div id="toast" class="toast"></div>
+      <div id="hint" class="hint">先建造信号灯，再点「开始运营」</div>
+
+      <button id="buildBtn" class="build-btn">＋ 建造信号灯</button>
+      <button id="startCta" class="start-cta">开始运营 →</button>
+
+      <div id="buildPop" class="build-pop hidden">
+        <div class="bp-head">
+          <span id="bpTitle">路口</span>
+          <button id="bpClose" class="bp-close">×</button>
+        </div>
+        <div class="bp-grid" id="bpGrid"></div>
+        <div class="bp-note">一次可添加多个灯头；点空白处关闭。</div>
+      </div>
+
+      <div id="headPanel" class="head-panel hidden">
+        <button id="hpClose" class="hp-close">×</button>
+        <div class="hp-title" id="hpTitle">路口 · 灯头</div>
+        <div class="hp-sub"><span id="hpPhase">绿灯</span><span id="hpCycle">周期 60s</span></div>
+        <canvas id="hpBar" width="472" height="36"></canvas>
+        <div class="hp-row">
+          <span>绿灯时长</span>
+          <button class="hp-step" data-hp="green" data-dir="-1">−</button>
+          <b><span id="hpGreen">20</span>s</b>
+          <button class="hp-step" data-hp="green" data-dir="1">+</button>
+        </div>
+        <div class="hp-row">
+          <span>起始时刻</span>
+          <button class="hp-step" data-hp="start" data-dir="-1">−</button>
+          <b><span id="hpStart">0</span>s</b>
+          <button class="hp-step" data-hp="start" data-dir="1">+</button>
+        </div>
+        <div class="hp-note" id="hpNote"></div>
+        <div class="hp-actions"><button id="hpRemove" class="hp-remove">拆除信号</button></div>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <section class="card score-card">
+        <div class="score-top">
+          <span class="card-title">实时评分</span>
+          <span id="gradeTag" class="grade">—</span>
+        </div>
+        <div class="score-num"><span id="scoreValue">--</span><em>分</em></div>
+        <div class="score-sub">综合平均等待 <b id="avgWait">—</b> 秒</div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">实时指标 <span class="muted">平均等待 / 已通过</span></div>
+        <div class="metrics">
+          <div class="metric">
+            <span class="dot car"></span><span class="mname">机动车</span>
+            <span class="mwait"><b id="carWait">0.0</b>s</span>
+            <span class="mdone" id="carDone">0 通过</span>
+          </div>
+          <div class="metric">
+            <span class="dot bike"></span><span class="mname">非机动车</span>
+            <span class="mwait"><b id="bikeWait">0.0</b>s</span>
+            <span class="mdone" id="bikeDone">0 通过</span>
+          </div>
+          <div class="metric">
+            <span class="dot ped"></span><span class="mname">行人</span>
+            <span class="mwait"><b id="pedWait">0.0</b>s</span>
+            <span class="mdone" id="pedDone">0 通过</span>
+          </div>
+          <div class="metric">
+            <span class="dot conflict"></span><span class="mname">冲突</span>
+            <span class="mwait"><b id="conflictVal">0</b>次</span>
+            <span class="mdone">交叠扣分</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-title">信号灯</div>
+        <div class="empty">
+          点地图上的灯头打开配时浮窗；点左下角「建造信号灯」在路口添加灯头。
+          每个灯头独立计时（60 秒周期），冲突方向同时绿灯会产生冲突扣分。
+        </div>
+      </section>
+
+      <section class="card speed-card">
+        <div class="card-title">速度分布 <span class="muted">逐个体正态抽样</span></div>
+        <div class="seg-tabs" id="speedTabs">
+          <button data-type="car" class="on">机动车</button>
+          <button data-type="bike">非机动车</button>
+          <button data-type="ped">行人</button>
+        </div>
+        <canvas id="speedChart" width="632" height="148"></canvas>
+        <div class="speed-stats">
+          <span>均值 <b id="speedMeanTxt">40.8</b> <em id="speedUnit">km/h</em></span>
+          <span>σ <b id="speedSdTxt">10</b>%</span>
+          <span>在途 <b id="speedActiveTxt">0</b></span>
+        </div>
+        <div class="row">
+          <span class="label">平均速度</span>
+          <button class="step" data-spd="mean" data-dir="-1">−</button>
+          <b><span id="speedMeanVal">40.8</span><small id="speedMeanUnit">km/h</small></b>
+          <button class="step" data-spd="mean" data-dir="1">+</button>
+        </div>
+        <div class="row">
+          <span class="label">离散度 σ</span>
+          <button class="step" data-spd="sd" data-dir="-1">−</button>
+          <b><span id="speedSdVal">10</span><small>%</small></b>
+          <button class="step" data-spd="sd" data-dir="1">+</button>
+        </div>
+        <div class="field-note">调整立即作用于在途与后续进入的个体。初始离散度参考实测：行人约 19%，机动车约 10%。</div>
+      </section>
+
+      <section class="card tips">
+        <div class="card-title">规划要诀</div>
+        <ul id="tipList">
+          <li>绿灯越长该方向排空越快，但另一方向的等待也会变长。</li>
+          <li>相位差为正表示比基准晚放行；主车流下游依次晚 8～10 秒，便能形成“绿波”。</li>
+          <li>行人要在绿灯剩余时间足够时才能开始过街。</li>
+        </ul>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<div id="modal" class="modal">
+  <div class="modal-card" id="modalCard"></div>
+</div>
+
+<script src="js/config.js?v=9"></script>
+<script src="js/signals.js?v=9"></script>
+<script src="js/network.js?v=9"></script>
+<script src="js/agents.js?v=9"></script>
+<script src="js/render.js?v=9"></script>
+<script src="js/game.js?v=9"></script>
+</body>
+</html>
